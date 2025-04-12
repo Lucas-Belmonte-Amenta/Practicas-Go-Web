@@ -11,7 +11,7 @@
 | 5 | Variables de entorno                    | [Link Teoría](https://docs.google.com/presentation/d/e/2PACX-1vTeG4cgOsj-T7N5Lh1Ae393S55_z3bDPlKtCtdYc245uM147gMfERBKiaDPyvQ3-dXN-jyifnwFWJ-j/embed?start=false&loop=false&delayms=3000&slide=id.g11917cadced_4_312) | [Link Practica](https://docs.google.com/document/d/e/2PACX-1vTjmHULVI9zfyH0ImrXW85Lsm_YQhQEH8f6UU0jg9B8ocLUuq-7A5dYLp59Im4YKmsq2gi9On34BpHW/pub) |
 | Bonus | ???                                 | [Link Teoría 1](https://gosamples.dev/read-csv/) / [Link Teoría 2](https://pkg.go.dev/encoding/csv) | [Link Practica Extra](https://docs.google.com/document/d/e/2PACX-1vRdFrDBnPf81MuE1HTm6n9C2xz-XcWbnZhlYj-rvmr9ohmaKrfGeorWfg7ncGRFydPHyIQ2rWWzRUTt/pub) | // (Optativa)
 | 6 |  Testing web                            | [Link Teoría](https://docs.google.com/presentation/d/e/2PACX-1vQ_Y0XNE_tJpl-b0SrwctY0zd6XweCvgZZjhKHdiX9Ya9C9PP_U3vVdbEgq5lmv_jr0xd6yIyeFxALO/embed?start=false&loop=false&delayms=3000&slide=id.g11917cadced_4_312) | [Link Practica](https://docs.google.com/document/d/e/2PACX-1vTYYBk06jMa2FB3UkBTrghM4BUJiLmqnYoEEDEHGdnFU44f5zYssPhroJzybD04IVjdFc1DZkjt6gLM/pub) |
-| 7 |  |  |  |
+| 7 | Middlewares y Autentificación | [Link Teoría](https://docs.google.com/presentation/d/e/2PACX-1vRJsbFgRnpM9_jy0qbiXk0I544gWTH32UBd2w7sx22OZ34Y9T3FbAdMN9Ea6UYxKhC4DHkwY_wimhPs/embed?start=false&loop=false&delayms=3000&slide=id.g11917cadced_4_312) | [Link Practica](https://docs.google.com/document/d/e/2PACX-1vQ1OFigkLBUexwVha6xcL9-Jahq1kbeBIjzrPS0sT2ezxl_CsWHc4ApU6SC45x-_K_u1wIKPjbVcf0I/pub) |
 | 8 |  |  |  |
 
 
