@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -18,12 +20,25 @@ type Product struct {
 	Quantity    int     `json:"quantity"`
 	CodeValue   string  `json:"code_value"`
 	Expiration  string  `json:"expiration_date"`
-	IsPublished bool    `json:"is_published"`
+	IsPublished bool    `json:"is_published,omitempty"`
 	Price       float64 `json:"price"`
 }
 
-var Products []Product = []Product{}
+type ProductRequest struct {
+	Name        string  `json:"name"`
+	Quantity    int     `json:"quantity"`
+	CodeValue   string  `json:"code_value"`
+	Expiration  string  `json:"expiration_date"`
+	IsPublished bool    `json:"is_published,omitempty"`
+	Price       float64 `json:"price"`
+}
 
+// Controller contiene la "base de datos" en memoria
+type productController struct {
+	products []Product
+}
+
+// función para leer un archivo JSON y deserializarlo en un slice de Product
 func ReadJSONFile[T any](fileName string, emptyListEntity *[]T) error {
 	// Abrir el archivo
 	file, err := os.Open(fileName)
@@ -48,7 +63,50 @@ func ReadJSONFile[T any](fileName string, emptyListEntity *[]T) error {
 
 }
 
-func HandlerPing(w http.ResponseWriter, r *http.Request) {
+// función para crear un nuevo controlador de productos
+func NewProductController() *productController {
+
+	var products []Product
+
+	err := ReadJSONFile("products.json", &products)
+	if err != nil {
+		panic("Error al leer el archivo JSON: " + err.Error())
+	}
+
+	return &productController{products: products}
+
+}
+
+func (controller *productController) ValidateProduct(product Product) error {
+
+	switch {
+	case product.Name == "":
+		return errors.New("El nombre del producto es un campo requerido")
+	case product.CodeValue == "":
+		return errors.New("El codigo del producto es un campo requerido")
+	case product.Expiration == "":
+		return errors.New("La fecha de expiración del producto es un campo requerido")
+	case product.Price == 0:
+		return errors.New("El precio del producto es un campo requerido")
+	case product.Quantity == 0:
+		return errors.New("La stock del producto es un campo requerido")
+	}
+
+	_, err := time.Parse("25-05-1810", product.Expiration)
+	if err != nil {
+		return errors.New("La fecha de expiración es inválida. El formato debe ser dd-mm-aaaa")
+	}
+
+	var index int = slices.IndexFunc(controller.products, func(p Product) bool { return p.CodeValue == product.CodeValue })
+	if index != -1 {
+		return errors.New("El código del producto ingresado ya existe")
+	}
+
+	return nil
+
+}
+
+func (controller *productController) HandlerPing(w http.ResponseWriter, r *http.Request) {
 	err := json.NewEncoder(w).Encode("pong")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -58,10 +116,10 @@ func HandlerPing(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func HandlerGetAllProduct(w http.ResponseWriter, r *http.Request) {
+func (controller *productController) HandlerGetAllProduct(w http.ResponseWriter, r *http.Request) {
 
 	// Serializar el slice de Product a JSON y enviarlo en la respuesta
-	err := json.NewEncoder(w).Encode(Products)
+	err := json.NewEncoder(w).Encode(controller.products)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -73,7 +131,7 @@ func HandlerGetAllProduct(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func HandlerGetProductByID(w http.ResponseWriter, r *http.Request) {
+func (controller *productController) HandlerGetProductByID(w http.ResponseWriter, r *http.Request) {
 
 	// Obtener el ID de los parámetros de la URL
 	var idStr string = chi.URLParam(r, "id")
@@ -84,7 +142,7 @@ func HandlerGetProductByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Buscar el producto en el slice usando slices.IndexFunc
-	index := slices.IndexFunc(Products, func(product Product) bool {
+	index := slices.IndexFunc(controller.products, func(product Product) bool {
 		return product.ID == id
 	})
 
@@ -93,7 +151,7 @@ func HandlerGetProductByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Producto no encontrado", http.StatusNotFound)
 		return
 	}
-	product := Products[index]
+	product := controller.products[index]
 
 	// Serializar el slice de Product a JSON y enviarlo en la respuesta
 	err = json.NewEncoder(w).Encode(product)
@@ -108,7 +166,7 @@ func HandlerGetProductByID(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func HandlerSearchProductByPrice(w http.ResponseWriter, r *http.Request) {
+func (controller *productController) HandlerSearchProductByPrice(w http.ResponseWriter, r *http.Request) {
 
 	// Obtener el ID de los parámetros de la URL
 	var priceGtStr string = r.URL.Query().Get("priceGt")
@@ -126,7 +184,7 @@ func HandlerSearchProductByPrice(w http.ResponseWriter, r *http.Request) {
 
 	// Buscar los productos en el slice
 
-	filteredProducts := slices.DeleteFunc(slices.Clone(Products), func(product Product) bool {
+	filteredProducts := slices.DeleteFunc(slices.Clone(controller.products), func(product Product) bool {
 		return !(product.Price >= priceGt)
 	})
 
@@ -150,22 +208,16 @@ func HandlerSearchProductByPrice(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-	err := ReadJSONFile("products.json", &Products)
-	if err != nil {
-		panic("Error al leer el archivo JSON: " + err.Error())
-	}
+	var controller *productController = NewProductController()
 
 	var router chi.Router = chi.NewRouter()
-	router.Get("/ping", HandlerPing)
+	router.Get("/ping", controller.HandlerPing)
 	router.Route("/products", func(r chi.Router) {
-
 		r.Group(func(r chi.Router) {
-			r.Get("/", HandlerGetAllProduct)
-			r.Get("/{id}", HandlerGetProductByID)
-			r.Get("/search", HandlerSearchProductByPrice)
-
+			r.Get("/", controller.HandlerGetAllProduct)
+			r.Get("/{id}", controller.HandlerGetProductByID)
+			r.Get("/search", controller.HandlerSearchProductByPrice)
 		})
-
 	})
 
 	if err := http.ListenAndServe(":8080", router); err != nil {
