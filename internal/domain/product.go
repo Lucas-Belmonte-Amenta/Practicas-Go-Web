@@ -1,5 +1,10 @@
 package domain
 
+import (
+	"errors"
+	"time"
+)
+
 type Product struct {
 	ID          int     `json:"id"`
 	Name        string  `json:"name"`
@@ -41,9 +46,9 @@ func ProductResponseFromProductBase(product Product) ProductResponse {
 	}
 }
 
-func ProductFromProductRequest(productRequest ProductRequest, id int) Product {
+func ProductFromProductRequest(productRequest ProductRequest) Product {
 	return Product{
-		ID:          id,
+		ID:          0,
 		Name:        productRequest.Name,
 		Quantity:    productRequest.Quantity,
 		CodeValue:   productRequest.CodeValue,
@@ -51,4 +56,28 @@ func ProductFromProductRequest(productRequest ProductRequest, id int) Product {
 		IsPublished: productRequest.IsPublished,
 		Price:       productRequest.Price,
 	}
+}
+
+func (product *Product) ValidateProduct() error {
+
+	switch {
+	case product.Name == "":
+		return errors.New("El nombre del producto es un campo requerido")
+	case product.CodeValue == "":
+		return errors.New("El codigo del producto es un campo requerido")
+	case product.Expiration == "":
+		return errors.New("La fecha de expiración del producto es un campo requerido")
+	case product.Price == 0:
+		return errors.New("El precio del producto es un campo requerido")
+	case product.Quantity == 0:
+		return errors.New("La stock del producto es un campo requerido")
+	}
+
+	_, err := time.Parse("02/01/2006", product.Expiration)
+	if err != nil {
+		return errors.New("La fecha de expiración es inválida. El formato debe ser dd/mm/aaaa")
+	}
+
+	return nil
+
 }

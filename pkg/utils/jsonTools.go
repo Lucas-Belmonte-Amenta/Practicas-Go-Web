@@ -31,3 +31,20 @@ func ReadJSONFile[T any](fileName string, emptyListEntity *[]T) error {
 	return nil
 
 }
+
+// función para escribir un slice de Product en un archivo JSON
+func WriteJSONFile[T any](fileName string, emptyListEntity []T) error {
+
+	// Crear el archivo
+	file, err := os.Create(fileName)
+	if err != nil {
+		return fmt.Errorf("Error al crear el archivo Json: %s\n", err)
+	}
+	defer file.Close()
+
+	// Serializar el slice de Product a JSON y escribirlo en el archivo
+	json.NewEncoder(file).Encode(emptyListEntity)
+
+	return nil
+
+}
