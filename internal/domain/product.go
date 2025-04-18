@@ -26,12 +26,12 @@ type ProductResponse struct {
 }
 
 type ProductRequest struct {
-	Name        string  `json:"name"`
-	Quantity    int     `json:"quantity"`
-	CodeValue   string  `json:"code_value"`
-	Expiration  string  `json:"expiration_date"`
-	IsPublished bool    `json:"is_published,omitempty"`
-	Price       float64 `json:"price"`
+	Name        *string  `json:"name"`
+	Quantity    *int     `json:"quantity"`
+	CodeValue   *string  `json:"code_value"`
+	Expiration  *string  `json:"expiration_date"`
+	IsPublished *bool    `json:"is_published,omitempty"`
+	Price       *float64 `json:"price"`
 }
 
 func ProductResponseFromProductBase(product Product) ProductResponse {
@@ -46,16 +46,56 @@ func ProductResponseFromProductBase(product Product) ProductResponse {
 	}
 }
 
+func ProductResponsesFromProductsBase(products []Product) []ProductResponse {
+	productsResponses := make([]ProductResponse, len(products))
+	for i, product := range products {
+		productsResponses[i] = ProductResponseFromProductBase(product)
+	}
+	return productsResponses
+}
+
 func ProductFromProductRequest(productRequest ProductRequest) Product {
+
+	if productRequest.Name == nil {
+		defaultName := ""
+		productRequest.Name = &defaultName
+	}
+
+	if productRequest.Quantity == nil {
+		defaultQuantity := 0
+		productRequest.Quantity = &defaultQuantity
+	}
+
+	if productRequest.CodeValue == nil {
+		defaultCodeValue := ""
+		productRequest.CodeValue = &defaultCodeValue
+	}
+
+	if productRequest.Expiration == nil {
+		defaultExpiration := ""
+		productRequest.Expiration = &defaultExpiration
+	}
+
+	if productRequest.IsPublished == nil {
+		defaultIsPublished := false
+		productRequest.IsPublished = &defaultIsPublished
+	}
+
+	if productRequest.Price == nil {
+		defaultPrice := 0.0
+		productRequest.Price = &defaultPrice
+	}
+
 	return Product{
 		ID:          0,
-		Name:        productRequest.Name,
-		Quantity:    productRequest.Quantity,
-		CodeValue:   productRequest.CodeValue,
-		Expiration:  productRequest.Expiration,
-		IsPublished: productRequest.IsPublished,
-		Price:       productRequest.Price,
+		Name:        *productRequest.Name,
+		Quantity:    *productRequest.Quantity,
+		CodeValue:   *productRequest.CodeValue,
+		Expiration:  *productRequest.Expiration,
+		IsPublished: *productRequest.IsPublished,
+		Price:       *productRequest.Price,
 	}
+
 }
 
 func (product *Product) ValidateProduct() error {

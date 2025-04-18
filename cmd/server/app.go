@@ -71,12 +71,20 @@ func (s *Server) Run() error {
 	})
 
 	router.Route("/products", func(router chi.Router) {
+
 		router.Group(func(router chi.Router) {
 			router.Get("/", ph.HandlerGetAllProduct)
 			router.Get("/{id}", ph.HandlerGetProductByID)
 			router.Get("/search", ph.HandlerSearchProductByPrice)
-			router.Post("/", ph.HandlerCreateProduct)
 		})
+
+		router.Group(func(router chi.Router) {
+			router.Post("/", ph.HandlerCreateProduct)
+			router.Patch("/{id}", ph.HandlerUpdatePartialProduct)
+			router.Put("/{id}", ph.HandlerUpdateProduct)
+			router.Delete("/{id}", ph.HandlerDeleteProduct)
+		})
+
 	})
 
 	return http.ListenAndServe(s.serverAddress, router)

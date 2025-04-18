@@ -9,10 +9,13 @@ import (
 )
 
 type ProductService interface {
-	GetAll() ([]domain.Product, error)
-	GetByID(id int) (domain.Product, error)
-	SearchByPrice(priceGt float64) ([]domain.Product, error)
-	Create(product domain.Product) (domain.Product, error)
+	GetProducts() ([]domain.ProductResponse, error)
+	GetProductByID(id int) (domain.ProductResponse, error)
+	SearchProductByPrice(priceGt float64) ([]domain.ProductResponse, error)
+	PostProduct(product domain.ProductRequest) (domain.ProductResponse, error)
+	PutProduct(id int, product domain.ProductRequest) (domain.ProductResponse, error)
+	PatchProduct(id int, product domain.ProductRequest) (domain.ProductResponse, error)
+	DeleteProduct(id int) error
 }
 
 type productService struct {
@@ -29,23 +32,34 @@ func NewProductService(productRepository repository.ProductRepository) (*product
 
 }
 
-func (ps *productService) GetAll() ([]domain.Product, error) {
+func (ps *productService) GetProducts() ([]domain.ProductResponse, error) {
+
 	var products, err = ps.productRepository.GetAll()
+
 	if err != nil {
 		return nil, err
 	}
-	return products, nil
+
+	productsResponse := domain.ProductResponsesFromProductsBase(products)
+
+	return productsResponse, nil
+
 }
 
-func (ps *productService) GetByID(id int) (domain.Product, error) {
-	var product, err = ps.productRepository.GetByID(id)
+func (ps *productService) GetProductByID(id int) (domain.ProductResponse, error) {
+
+	product, err := ps.productRepository.Get(id)
 	if err != nil {
-		return domain.Product{}, err
+		return domain.ProductResponse{}, err
 	}
-	return product, nil
+
+	productResponse := domain.ProductResponseFromProductBase(product)
+
+	return productResponse, nil
+
 }
 
-func (ps *productService) SearchByPrice(priceGt float64) ([]domain.Product, error) {
+func (ps *productService) SearchProductByPrice(priceGt float64) ([]domain.ProductResponse, error) {
 
 	var products, err = ps.productRepository.GetAll()
 	if err != nil {
@@ -59,18 +73,144 @@ func (ps *productService) SearchByPrice(priceGt float64) ([]domain.Product, erro
 		return nil, fmt.Errorf("No se encontraron productos con un precio mayor o igual a %f", priceGt)
 	}
 
-	return filteredProducts, nil
+	productsResponses := domain.ProductResponsesFromProductsBase(filteredProducts)
+
+	return productsResponses, nil
 
 }
 
-func (ps *productService) Create(product domain.Product) (domain.Product, error) {
+func (ps *productService) validateCodeValue(codeValue string) error {
+
+	var products, err = ps.productRepository.GetAll()
+	if err != nil {
+		return err
+	}
+
+	var index int = slices.IndexFunc(products, func(product domain.Product) bool {
+		return product.CodeValue == codeValue
+	})
+
+	if index == -1 {
+		return nil
+	}
+
+	return fmt.Errorf("Ya existe un producto registrado con el codigo %s", codeValue)
+}
+
+func (ps *productService) validateNewProduct(newProduct domain.Product) error {
+
+	err := newProduct.ValidateProduct()
+	if err != nil {
+		return err
+	}
+
+	err = ps.validateCodeValue(newProduct.CodeValue)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (ps *productService) PostProduct(product domain.ProductRequest) (domain.ProductResponse, error) {
+
+	newProduct := domain.ProductFromProductRequest(product)
 
 	id, err := ps.productRepository.GetNextID()
 	if err != nil {
-		return domain.Product{}, fmt.Errorf("Error al crear un nuevo producto: %s", err.Error())
+		return domain.ProductResponse{}, fmt.Errorf("Error al crear un nuevo producto: %s", err.Error())
 	}
-	product.ID = id
+	newProduct.ID = id
 
-	return ps.productRepository.Create(product)
+	if err := ps.validateNewProduct(newProduct); err != nil {
+		return domain.ProductResponse{}, fmt.Errorf("Ocurrió un error durante la creación del nuevo producto: %s", err.Error())
+	}
+
+	productCreated, err := ps.productRepository.Create(newProduct)
+	if err != nil {
+		return domain.ProductResponse{}, fmt.Errorf("Error al crear un nuevo producto: %s", err.Error())
+	}
+
+	return domain.ProductResponseFromProductBase(productCreated), nil
+
+}
+
+func (ps *productService) PutProduct(id int, product domain.ProductRequest) (domain.ProductResponse, error) {
+
+	productToUpdate := domain.ProductFromProductRequest(product)
+
+	if _, err := ps.GetProductByID(id); err != nil {
+		return domain.ProductResponse{}, err
+	}
+
+	productToUpdate.ID = id
+
+	if err := productToUpdate.ValidateProduct(); err != nil {
+		return domain.ProductResponse{}, err
+	}
+
+	productUpdated, err := ps.productRepository.Update(productToUpdate)
+	if err != nil {
+		return domain.ProductResponse{}, err
+	}
+
+	return domain.ProductResponseFromProductBase(productUpdated), nil
+}
+
+func (ps *productService) PatchProduct(id int, product domain.ProductRequest) (domain.ProductResponse, error) {
+
+	oldProduct, err := ps.productRepository.Get(id)
+	if err != nil {
+		return domain.ProductResponse{}, err
+	}
+
+	if product.Name != nil {
+		oldProduct.Name = *product.Name
+	}
+
+	if product.Quantity != nil {
+		oldProduct.Quantity = *product.Quantity
+	}
+
+	if (product.CodeValue != nil) && (*product.CodeValue != oldProduct.CodeValue) {
+		if ps.validateCodeValue(*product.CodeValue) != nil {
+			oldProduct.CodeValue = *product.CodeValue
+		}
+	}
+
+	if product.Expiration != nil {
+		oldProduct.Expiration = *product.Expiration
+	}
+
+	if product.Price != nil {
+		oldProduct.Price = *product.Price
+	}
+
+	if oldProduct.ValidateProduct() != nil {
+		return domain.ProductResponse{}, err
+	}
+
+	productUpdated, err := ps.productRepository.Update(oldProduct)
+	if err != nil {
+		return domain.ProductResponse{}, err
+	}
+
+	return domain.ProductResponseFromProductBase(productUpdated), nil
+
+}
+
+func (ps *productService) DeleteProduct(id int) error {
+
+	if _, err := ps.GetProductByID(id); err != nil {
+		return err
+	}
+
+	err := ps.productRepository.Delete(id)
+	if err != nil {
+		return err
+	}
+
+	return nil
 
 }
