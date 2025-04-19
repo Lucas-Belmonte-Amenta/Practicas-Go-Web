@@ -2,7 +2,7 @@ package repository
 
 import (
 	"PRACTICAS-GO-WEB/internal/domain"
-	"PRACTICAS-GO-WEB/pkg/utils"
+	"PRACTICAS-GO-WEB/internal/storage"
 	"cmp"
 	"fmt"
 	"slices"
@@ -20,14 +20,14 @@ type ProductRepository interface {
 }
 
 type productRepository struct {
+	storage  storage.Storage
 	products []domain.Product
-	filePath string
 	lastID   int
 }
 
-func NewProductRepository(filepath string) (*productRepository, error) {
+func NewProductRepository(storage storage.Storage) (*productRepository, error) {
 
-	repository := &productRepository{filePath: filepath}
+	repository := &productRepository{storage: storage}
 	err := repository.LoadAll()
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (pr *productRepository) GetNextID() (int, error) {
 func (pr *productRepository) LoadAll() error {
 	var products []domain.Product
 
-	err := utils.ReadJSONFile(pr.filePath, &products)
+	err := pr.storage.Read(&products)
 	if err != nil {
 		return fmt.Errorf("Error al recuperar los datos almacenados: %s", err.Error())
 	}
@@ -61,7 +61,7 @@ func (pr *productRepository) LoadAll() error {
 
 func (pr *productRepository) SaveAll() error {
 
-	err := utils.WriteJSONFile(pr.filePath, pr.products)
+	err := pr.storage.Write(pr.products)
 	if err != nil {
 		return fmt.Errorf("Error al almacenar los datos: %s", err.Error())
 	}

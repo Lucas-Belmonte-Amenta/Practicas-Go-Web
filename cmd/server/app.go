@@ -7,6 +7,7 @@ import (
 	"PRACTICAS-GO-WEB/internal/handlers"
 	"PRACTICAS-GO-WEB/internal/repository"
 	"PRACTICAS-GO-WEB/internal/service"
+	"PRACTICAS-GO-WEB/internal/storage"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -48,8 +49,14 @@ func NewServer(cfg *ConfigServer) *Server {
 
 }
 
-func (s *Server) Run() error {
-	pr, err := repository.NewProductRepository(s.staticFilesPath)
+func (s *Server) Run(tokenAuthorization string) error {
+
+	sj, err := storage.NewStorageJSON(s.staticFilesPath)
+	if err != nil {
+		return fmt.Errorf("Error al crear el almacenamiento JSON: %s", err.Error())
+	}
+
+	pr, err := repository.NewProductRepository(sj)
 	if err != nil {
 		return fmt.Errorf("Error al crear el repositorio de productos: %s", err.Error())
 	}

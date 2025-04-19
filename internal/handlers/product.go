@@ -5,16 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 
 	"PRACTICAS-GO-WEB/internal/domain"
 	"PRACTICAS-GO-WEB/internal/service"
+	"PRACTICAS-GO-WEB/pkg/web"
 
 	"github.com/go-chi/chi/v5"
 )
 
 type productHandler struct {
-	service service.ProductService
+	service            service.ProductService
+	tokenAuthorization string
 }
 
 type ProductHandler interface {
@@ -31,7 +34,8 @@ type ProductHandler interface {
 // función para crear un nuevo controlador de productos
 func NewProductHandler(service service.ProductService) ProductHandler {
 
-	return &productHandler{service: service}
+	token := os.Getenv("Token")
+	return &productHandler{service: service, tokenAuthorization: token}
 
 }
 
@@ -50,49 +54,29 @@ func (ph *productHandler) HandlerGetAllProduct(w http.ResponseWriter, r *http.Re
 	// Obtener todos los productos del servicio
 	products, err := ph.service.GetProducts()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		web.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// Serializar el slice de Product a JSON y enviarlo en la respuesta
-	err = json.NewEncoder(w).Encode(products)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Establecer el encabezado Content-Type y el código de estado
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	web.Success(w, http.StatusOK, "products found", products)
 
 }
 
 func (ph *productHandler) HandlerGetProductByID(w http.ResponseWriter, r *http.Request) {
 
 	// Obtener el ID de los parámetros de la URL
-	var idStr string = chi.URLParam(r, "id")
-	id, err := strconv.Atoi(idStr)
+	id, err := ph.validateHeaderID(w, r)
 	if err != nil {
-		http.Error(w, "El ID debe ser un número entero", http.StatusBadRequest)
 		return
 	}
 
 	product, err := ph.service.GetProductByID(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		web.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// Serializar el slice de Product a JSON y enviarlo en la respuesta
-	err = json.NewEncoder(w).Encode(product)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Establecer el encabezado Content-Type y el código de estado
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	web.Success(w, http.StatusOK, "product found", product)
 
 }
 
@@ -101,40 +85,37 @@ func (ph *productHandler) HandlerSearchProductByPrice(w http.ResponseWriter, r *
 	// Obtener el ID de los parámetros de la URL
 	var priceGtStr string = r.URL.Query().Get("priceGt")
 	if priceGtStr == "" {
-		http.Error(w, "El priceGt es requerido", http.StatusBadRequest)
+		web.Error(w, http.StatusBadRequest, "El valor de priceGt es requerido")
 		return
 	}
 
 	// Convertir el priceGt a float64
 	priceGt, err := strconv.ParseFloat(priceGtStr, 64)
 	if err != nil {
-		http.Error(w, "El priceGt debe ser un numero decimal", http.StatusBadRequest)
+		web.Error(w, http.StatusBadRequest, "El valor de priceGt debe ser un numero decimal")
 		return
 	}
 
 	// Buscar los productos en el slice
 	filteredProducts, err := ph.service.SearchProductByPrice(priceGt)
 
-	// Serializar el slice de Product a JSON y enviarlo en la respuesta
-	err = json.NewEncoder(w).Encode(filteredProducts)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Establecer el encabezado Content-Type y el código de estado
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	web.Success(w, http.StatusOK, "products found", filteredProducts)
 
 }
 
 func (ph *productHandler) HandlerCreateProduct(w http.ResponseWriter, r *http.Request) {
 
+	token := r.Header.Get("Token")
+	if token != ph.tokenAuthorization {
+		web.Error(w, http.StatusUnauthorized, "Token de autentificación inválido")
+		return
+	}
+
 	// Leer el cuerpo de la solicitud
 	var productRequest domain.ProductRequest
 	err := json.NewDecoder(r.Body).Decode(&productRequest)
 	if err != nil {
-		http.Error(w, "Error al leer el cuerpo de la solicitud", http.StatusBadRequest)
+		web.Error(w, http.StatusBadRequest, "Error al leer el cuerpo de la solicitud")
 		return
 	}
 
@@ -142,37 +123,33 @@ func (ph *productHandler) HandlerCreateProduct(w http.ResponseWriter, r *http.Re
 	err = ph.validateFullRequest(productRequest)
 	if err != nil {
 		errStr := fmt.Sprintf("Error al validar los datos del producto: %s", err.Error())
-		http.Error(w, errStr, http.StatusBadRequest)
+		web.Error(w, http.StatusBadRequest, errStr)
 		return
 	}
 
 	// Validar el producto
 	productCreated, err := ph.service.PostProduct(productRequest)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		errStr := fmt.Sprintf("Error al registrar el nuevo producto: %s", err.Error())
+		web.Error(w, http.StatusInternalServerError, errStr)
 		return
 	}
 
-	// Preparar la serialización del nuevo Product a JSON y enviarlo en la respuesta despues de agregarlo al slice
-	err = json.NewEncoder(w).Encode(productCreated)
-	if err != nil {
-		http.Error(w, "Ocurrió un error inesperado en el procesado de la solicitud.", http.StatusInternalServerError)
-		return
-	}
-
-	// Establecer el encabezado Content-Type y el código de estado
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	web.Success(w, http.StatusCreated, "product created", productCreated)
 
 }
 
 func (ph *productHandler) HandlerUpdateProduct(w http.ResponseWriter, r *http.Request) {
 
+	token := r.Header.Get("Token")
+	if token != ph.tokenAuthorization {
+		web.Error(w, http.StatusUnauthorized, "Token de autentificación inválido")
+		return
+	}
+
 	// Obtener el ID de los parámetros de la URL
-	var idStr string = chi.URLParam(r, "id")
-	id, err := strconv.Atoi(idStr)
+	id, err := ph.validateHeaderID(w, r)
 	if err != nil {
-		http.Error(w, "El ID debe ser un número entero", http.StatusBadRequest)
 		return
 	}
 
@@ -180,7 +157,8 @@ func (ph *productHandler) HandlerUpdateProduct(w http.ResponseWriter, r *http.Re
 	var productRequest domain.ProductRequest
 	err = json.NewDecoder(r.Body).Decode(&productRequest)
 	if err != nil {
-		http.Error(w, "Error al leer el cuerpo de la solicitud", http.StatusBadRequest)
+		errStr := fmt.Sprintf("Error al leer el cuerpo de la solicitud: %s", err.Error())
+		web.Error(w, http.StatusBadRequest, errStr)
 		return
 	}
 
@@ -188,37 +166,33 @@ func (ph *productHandler) HandlerUpdateProduct(w http.ResponseWriter, r *http.Re
 	err = ph.validateFullRequest(productRequest)
 	if err != nil {
 		errStr := fmt.Sprintf("Error al validar los datos del producto: %s", err.Error())
-		http.Error(w, errStr, http.StatusBadRequest)
+		web.Error(w, http.StatusBadRequest, errStr)
 		return
 	}
 
 	// Validar el producto
 	productUpdated, err := ph.service.PutProduct(id, productRequest)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		errStr := fmt.Sprintf("Error al actualizar el producto: %s", err.Error())
+		web.Error(w, http.StatusBadRequest, errStr)
 		return
 	}
 
-	// Preparar la serialización del nuevo Product a JSON y enviarlo en la respuesta despues de agregarlo al slice
-	err = json.NewEncoder(w).Encode(productUpdated)
-	if err != nil {
-		http.Error(w, "Ocurrió un error inesperado en el procesado de la solicitud.", http.StatusInternalServerError)
-		return
-	}
-
-	// Establecer el encabezado Content-Type y el código de estado
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	web.Success(w, http.StatusOK, "product updated", productUpdated)
 
 }
 
 func (ph *productHandler) HandlerUpdatePartialProduct(w http.ResponseWriter, r *http.Request) {
 
+	token := r.Header.Get("Token")
+	if token != ph.tokenAuthorization {
+		web.Error(w, http.StatusUnauthorized, "Token de autentificación inválido")
+		return
+	}
+
 	// Obtener el ID de los parámetros de la URL
-	var idStr string = chi.URLParam(r, "id")
-	id, err := strconv.Atoi(idStr)
+	id, err := ph.validateHeaderID(w, r)
 	if err != nil {
-		http.Error(w, "El ID debe ser un número entero", http.StatusBadRequest)
 		return
 	}
 
@@ -226,55 +200,44 @@ func (ph *productHandler) HandlerUpdatePartialProduct(w http.ResponseWriter, r *
 	var productRequest domain.ProductRequest
 	err = json.NewDecoder(r.Body).Decode(&productRequest)
 	if err != nil {
-		http.Error(w, "Error al leer el cuerpo de la solicitud", http.StatusBadRequest)
+		web.Error(w, http.StatusBadRequest, "Error al leer el cuerpo de la solicitud")
 		return
 	}
 
 	// Validar el producto
 	productUpdated, err := ph.service.PatchProduct(id, productRequest)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		errStr := fmt.Sprintf("Error al actualizar el producto: %s", err.Error())
+		web.Error(w, http.StatusBadRequest, errStr)
 		return
 	}
 
-	// Preparar la serialización del nuevo Product a JSON y enviarlo en la respuesta despues de agregarlo al slice
-	err = json.NewEncoder(w).Encode(productUpdated)
-	if err != nil {
-		http.Error(w, "Ocurrió un error inesperado en el procesado de la solicitud.", http.StatusInternalServerError)
-		return
-	}
-
-	// Establecer el encabezado Content-Type y el código de estado
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	web.Success(w, http.StatusOK, "product updated", productUpdated)
 
 }
 
 func (ph *productHandler) HandlerDeleteProduct(w http.ResponseWriter, r *http.Request) {
 
+	token := r.Header.Get("Token")
+	if token != ph.tokenAuthorization {
+		web.Error(w, http.StatusUnauthorized, "Token de autentificación inválido")
+		return
+	}
+
 	// Obtener el ID de los parámetros de la URL
-	var idStr string = chi.URLParam(r, "id")
-	id, err := strconv.Atoi(idStr)
+	id, err := ph.validateHeaderID(w, r)
 	if err != nil {
-		http.Error(w, "El ID debe ser un número entero", http.StatusBadRequest)
 		return
 	}
 
 	err = ph.service.DeleteProduct(id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errStr := fmt.Sprintf("Error al eliminar el producto: %s", err.Error())
+		web.Error(w, http.StatusInternalServerError, errStr)
 		return
 	}
 
-	err = json.NewEncoder(w).Encode("El producto se eliminó correctamente")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Establecer el encabezado Content-Type y el código de estado
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
+	web.Success(w, http.StatusNoContent, "product deleted", nil)
 
 }
 
@@ -305,5 +268,24 @@ func (ph *productHandler) validateFullRequest(productRequest domain.ProductReque
 	}
 
 	return nil
+
+}
+
+func (ph *productHandler) validateHeaderID(w http.ResponseWriter, r *http.Request) (int, error) {
+
+	// Obtener el ID de los parámetros de la URL
+	var idStr string = chi.URLParam(r, "id")
+	if idStr == "" {
+		web.Error(w, http.StatusBadRequest, "El ID del producto es un campo requerido")
+		return 0, errors.New("El ID es un campo requerido")
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		web.Error(w, http.StatusBadRequest, "El ID debe ser un número entero")
+		return 0, err
+	}
+
+	return id, nil
 
 }
