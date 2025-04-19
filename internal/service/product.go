@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 )
 
 type ProductService interface {
@@ -116,7 +117,10 @@ func (ps *productService) validateNewProduct(newProduct domain.Product) error {
 
 func (ps *productService) PostProduct(product domain.ProductRequest) (domain.ProductResponse, error) {
 
-	newProduct := domain.ProductFromProductRequest(product)
+	newProduct, err := domain.ProductFromProductRequest(product)
+	if err != nil {
+		return domain.ProductResponse{}, err
+	}
 
 	id, err := ps.productRepository.GetNextID()
 	if err != nil {
@@ -139,7 +143,10 @@ func (ps *productService) PostProduct(product domain.ProductRequest) (domain.Pro
 
 func (ps *productService) PutProduct(id int, product domain.ProductRequest) (domain.ProductResponse, error) {
 
-	productToUpdate := domain.ProductFromProductRequest(product)
+	productToUpdate, err := domain.ProductFromProductRequest(product)
+	if err != nil {
+		return domain.ProductResponse{}, err
+	}
 
 	if _, err := ps.GetProductByID(id); err != nil {
 		return domain.ProductResponse{}, err
@@ -181,7 +188,12 @@ func (ps *productService) PatchProduct(id int, product domain.ProductRequest) (d
 	}
 
 	if product.Expiration != nil {
-		oldProduct.Expiration = *product.Expiration
+		expiration, err := time.Parse("02/01/2006", *product.Expiration)
+		if err != nil {
+			return domain.ProductResponse{}, err
+		}
+
+		oldProduct.Expiration = &expiration
 	}
 
 	if product.Price != nil {

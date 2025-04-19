@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"PRACTICAS-GO-WEB/internal/domain"
 	"PRACTICAS-GO-WEB/internal/service"
@@ -255,8 +256,10 @@ func (ph *productHandler) validateFullRequest(productRequest domain.ProductReque
 		return errors.New("El codigo del producto es un campo requerido")
 	}
 
-	if productRequest.Expiration == nil {
-		return errors.New("La fecha de expiración del producto es un campo requerido")
+	if productRequest.Expiration != nil {
+		if _, err := time.Parse("02/01/2006", *productRequest.Expiration); err != nil {
+			return errors.New("La fecha de expiración no posee un formato válido")
+		}
 	}
 
 	if productRequest.IsPublished == nil {

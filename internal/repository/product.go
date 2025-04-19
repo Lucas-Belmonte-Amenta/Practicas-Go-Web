@@ -48,20 +48,22 @@ func (pr *productRepository) GetNextID() (int, error) {
 }
 
 func (pr *productRepository) LoadAll() error {
-	var products []domain.Product
+	var products []domain.ProductStorage
 
 	err := pr.storage.Read(&products)
 	if err != nil {
 		return fmt.Errorf("Error al recuperar los datos almacenados: %s", err.Error())
 	}
 
-	pr.products = products
+	pr.products = domain.ProductsFromProductsStorage(products)
+
 	return nil
 }
 
 func (pr *productRepository) SaveAll() error {
 
-	err := pr.storage.Write(pr.products)
+	products := domain.ProductsStorageFromProducts(pr.products)
+	err := pr.storage.Write(products)
 	if err != nil {
 		return fmt.Errorf("Error al almacenar los datos: %s", err.Error())
 	}
